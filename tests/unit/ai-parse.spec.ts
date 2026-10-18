@@ -42,3 +42,22 @@ test.describe('extractText: 本文が空になる返却', () => {
     expect(extractText(null)).toBe('');
   });
 });
+
+test.describe('行頭の数字は本文として残す', () => {
+  test('parseTitle: 「22時に寝る」の 22 を消さない。箇条書きの番号・記号だけ取る', () => {
+    expect(parseTitle('22時に寝る')).toBe('22時に寝る');
+    expect(parseTitle('3月までに確定申告を終える')).toBe('3月までに確定申告を終える');
+    expect(parseTitle('1. 牛乳を買う')).toBe('牛乳を買う');
+    expect(parseTitle('2) 牛乳を買う')).toBe('牛乳を買う');
+    expect(parseTitle('- 牛乳を買う')).toBe('牛乳を買う');
+    expect(parseTitle('・牛乳を買う')).toBe('牛乳を買う');
+  });
+  test('parseSteps: 数字で始まるサブタスクも消さない', () => {
+    expect(parseSteps('1. 22時にスマホを置く\n2. 23時までに電気を消す\n3. 7時に起きる')).toEqual([
+      '22時にスマホを置く',
+      '23時までに電気を消す',
+      '7時に起きる',
+    ]);
+    expect(parseSteps('["22時にスマホを置く","7時に起きる"]')).toEqual(['22時にスマホを置く', '7時に起きる']);
+  });
+});

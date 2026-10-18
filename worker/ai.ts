@@ -28,6 +28,9 @@ export function extractText(res: unknown): string {
   return '';
 }
 
+/** 行頭の箇条書き記号(「- 」「・」「1. 」「2) 」)だけを取る。「22時に寝る」の数字は本文なので残す */
+const LIST_MARKER = /^\s*(?:[-*・•]\s*|\d{1,2}\s*[.)．、]\s*)+/;
+
 export function parseTitle(raw: string): string | null {
   const line = raw
     .replace(/```[a-z]*\n?|```/gi, '')
@@ -37,7 +40,7 @@ export function parseTitle(raw: string): string | null {
   if (!line) return null;
   const t = line
     .replace(/^(タスク名|タイトル|title)\s*[:：]\s*/i, '')
-    .replace(/^[-*・\d.)\s]+/, '')
+    .replace(LIST_MARKER, '')
     .replace(/^["'「『“]+|["'」』”]+$/g, '')
     .trim();
   return t.length >= 1 ? t.slice(0, 120) : null;
@@ -57,7 +60,7 @@ export function parseSteps(raw: string): string[] {
   if (items.length === 0) {
     items = raw
       .split('\n')
-      .map((l) => l.replace(/^[\s\-*・\d.)]+/, '').trim())
+      .map((l) => l.replace(LIST_MARKER, '').trim())
       .filter((l) => l && !l.startsWith('```') && !/^[[\]{}]$/.test(l));
   }
   const seen = new Set<string>();
