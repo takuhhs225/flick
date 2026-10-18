@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api';
 import type { User } from './types';
-import { useBoard } from './useBoard';
+import { readSavedBoard, useBoard } from './useBoard';
 import { ToastProvider, useToast } from './components/Toast';
 import { Board } from './components/Board';
 import { Composer, COMPOSER_ID } from './components/Composer';
@@ -62,14 +62,14 @@ function Root() {
   const boot = useCallback(async () => {
     setPhase({ name: 'boot' });
     try {
-      const r = await api.bootstrap();
+      const r = await api.bootstrap(readSavedBoard());
       if (!r.user) {
         writeHint(false);
         setPhase({ name: 'login' });
         return;
       }
       writeHint(true);
-      init(r.tasks ?? []);
+      init(r);
       setPhase({ name: 'app', user: r.user });
     } catch {
       setPhase({ name: 'error' });
@@ -127,10 +127,24 @@ function Root() {
   const booting = phase.name === 'boot';
   return (
     <div className="app" data-testid={booting ? 'skeleton' : 'app'} data-state={booting ? 'boot' : 'ready'} aria-busy={booting}>
-      {phase.name === 'app' ? <Header user={phase.user} onLogout={logout} /> : <HeaderSkeleton />}
+      {phase.name === 'app' ? <Header
+          user={phase.user}
+          onLogout={logout}
+          boards={{
+            boards: board.boards,
+            boardId: board.boardId,
+            onSwitch: board.switchBoard,
+            onCreate: board.createBoard,
+            onRename: board.renameBoard,
+            onAddMember: board.addMember,
+            onRemoveMember: board.removeMember,
+            onDelete: board.deleteBoard,
+          }}
+        /> : <HeaderSkeleton />}
       {composerVisible ? <Composer ready={!booting} onSubmit={board.add} /> : <ComposerSkeleton />}
       {phase.name === 'app' ? (
         <Board
+          switching={board.switching}
           tasks={board.tasks}
           hint={board.hint}
           busy={board.busy}

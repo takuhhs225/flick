@@ -86,7 +86,7 @@ test.describe('全画面スケルトンローディング', () => {
     await addMemo(page, '既存のメモ');
 
     // 読み込みを 1.5 秒遅らせてスケルトン状態を観察する
-    await page.route('**/api/bootstrap', async (route) => {
+    await page.route('**/api/bootstrap*', async (route) => {
       await new Promise((r) => setTimeout(r, 1500));
       await route.continue();
     });

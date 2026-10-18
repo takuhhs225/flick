@@ -5,6 +5,8 @@ import { useMediaQuery } from '../lib';
 import { Card } from './Card';
 
 interface BoardProps {
+  /** ボード切り替えの読み込み中 */
+  switching?: boolean;
   tasks: Task[];
   hint: MotionHint | null;
   busy: ReadonlySet<string>;
@@ -80,13 +82,14 @@ export function Board(props: BoardProps) {
   }, []);
 
   const byStatus = (s: Status) => props.tasks.filter((t) => t.status === s).sort((a, b) => b.position - a.position);
-  const { tasks: _omit, ...rest } = props;
+  const { tasks: _omit, switching, ...rest } = props;
   void _omit;
+  const cls = switching ? ' is-switching' : '';
 
   if (wide) {
     return (
       <LayoutGroup>
-        <div className="board" data-testid="board">
+        <div className={`board${cls}`} data-testid="board" aria-busy={!!switching}>
           {STATUSES.map((s) => (
             <Column key={s} status={s} tasks={byStatus(s)} firstLoad={firstLoad} {...rest} />
           ))}
@@ -110,7 +113,7 @@ export function Board(props: BoardProps) {
           </button>
         ))}
       </div>
-      <div className="board is-narrow" data-testid="board">
+      <div className={`board is-narrow${cls}`} data-testid="board" aria-busy={!!switching}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={tab}

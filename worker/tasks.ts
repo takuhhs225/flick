@@ -2,11 +2,12 @@ import { Hono } from 'hono';
 import type { Env, Vars } from './types';
 import { requireUser } from './auth';
 import { isUuid } from './util';
+import { isMember } from './boards';
 
 const STATUSES = ['todo', 'doing', 'done'] as const;
 type Status = (typeof STATUSES)[number];
 const MAX_TITLE = 500;
-const MAX_TASKS_PER_USER = 2000;
+const MAX_TASKS_PER_BOARD = 2000;
 
 interface Row {
   id: string;
@@ -39,17 +40,24 @@ const isFiniteNum = (v: unknown): v is number => typeof v === 'number' && Number
 export const tasks = new Hono<{ Bindings: Env; Variables: Vars }>();
 tasks.use('*', requireUser);
 
-export async function listTasks(db: D1Database, userId: string) {
+/** ボードのタスク一覧(呼び出し側でメンバー確認済みであること) */
+export async function listTasks(db: D1Database, boardId: string) {
   const { results } = await db
     .prepare(
-      'SELECT id, title, status, position, created_at, updated_at FROM tasks WHERE user_id = ?1 ORDER BY position DESC LIMIT 2000',
+      'SELECT id, title, status, position, created_at, updated_at FROM tasks WHERE board_id = ?1 ORDER BY position DESC LIMIT 2000',
     )
-    .bind(userId)
+    .bind(boardId)
     .all<Row>();
   return results.map(toDto);
 }
 
-tasks.get('/', async (c) => c.json({ tasks: await listTasks(c.env.DB, c.get('user').id) }));
+// ボード指定を省略すると個人ボード(id = ユーザー ID)
+tasks.get('/', async (c) => {
+  const user = c.get('user');
+  const boardId = c.req.query('board') ?? user.id;
+  if (!isUuid(boardId) || !(await isMember(c.env.DB, boardId, user.email))) return c.json({ error: 'not_found' }, 404);
+  return c.json({ tasks: await listTasks(c.env.DB, boardId) });
+});
 
 /** 作成 (クライアント生成 UUID。同じ ID の再送・削除の取り消しは上書きとして冪等に扱う) */
 tasks.post('/', async (c) => {
@@ -63,31 +71,35 @@ tasks.post('/', async (c) => {
   if (body.id !== undefined && !isUuid(body.id)) return c.json({ error: 'invalid_id' }, 400);
   if (body.position !== undefined && !isFiniteNum(body.position)) return c.json({ error: 'invalid_position' }, 400);
 
-  const userId = c.get('user').id;
+  const user = c.get('user');
+  const userId = user.id;
+  const boardId = body.boardId === undefined ? userId : body.boardId;
+  if (!isUuid(boardId)) return c.json({ error: 'invalid_board' }, 400);
+  if (!(await isMember(c.env.DB, boardId, user.email))) return c.json({ error: 'not_found' }, 404);
   const id = (body.id as string | undefined) ?? crypto.randomUUID();
   const now = Date.now();
   const position = (body.position as number | undefined) ?? now;
   const createdAt = isFiniteNum(body.createdAt) && body.createdAt > 0 && body.createdAt <= now ? body.createdAt : now;
 
-  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM tasks WHERE user_id = ?1')
-    .bind(userId)
+  const count = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM tasks WHERE board_id = ?1')
+    .bind(boardId)
     .first<{ n: number }>();
-  if ((count?.n ?? 0) >= MAX_TASKS_PER_USER) return c.json({ error: 'too_many_tasks' }, 409);
+  if ((count?.n ?? 0) >= MAX_TASKS_PER_BOARD) return c.json({ error: 'too_many_tasks' }, 409);
 
   await c.env.DB.prepare(
-    `INSERT INTO tasks (id, user_id, title, status, position, created_at, updated_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+    `INSERT INTO tasks (id, user_id, board_id, title, status, position, created_at, updated_at)
+     VALUES (?1, ?2, ?8, ?3, ?4, ?5, ?6, ?7)
      ON CONFLICT(id) DO UPDATE SET title = excluded.title, status = excluded.status,
        position = excluded.position, updated_at = excluded.updated_at
-     WHERE tasks.user_id = excluded.user_id`,
+     WHERE tasks.board_id = excluded.board_id`,
   )
-    .bind(id, userId, title, status, position, createdAt, now)
+    .bind(id, userId, title, status, position, createdAt, now, boardId)
     .run();
 
   const row = await c.env.DB.prepare(
-    'SELECT id, title, status, position, created_at, updated_at FROM tasks WHERE id = ?1 AND user_id = ?2',
+    'SELECT id, title, status, position, created_at, updated_at FROM tasks WHERE id = ?1 AND board_id = ?2',
   )
-    .bind(id, userId)
+    .bind(id, boardId)
     .first<Row>();
   // 他ユーザーの ID と衝突した場合は行が見えない
   if (!row) return c.json({ error: 'conflict' }, 409);
@@ -119,10 +131,12 @@ tasks.patch('/:id', async (c) => {
 
   sets.push(`updated_at = ?${binds.push(Date.now())}`);
   const idIdx = binds.push(id);
-  const userIdx = binds.push(c.get('user').id);
+  const emailIdx = binds.push(c.get('user').email.toLowerCase());
 
+  // 自分がメンバーのボードのタスクだけ更新できる
   const row = await c.env.DB.prepare(
-    `UPDATE tasks SET ${sets.join(', ')} WHERE id = ?${idIdx} AND user_id = ?${userIdx}
+    `UPDATE tasks SET ${sets.join(', ')} WHERE id = ?${idIdx}
+       AND board_id IN (SELECT board_id FROM board_members WHERE email = ?${emailIdx})
      RETURNING id, title, status, position, created_at, updated_at`,
   )
     .bind(...binds)
@@ -134,6 +148,10 @@ tasks.patch('/:id', async (c) => {
 tasks.delete('/:id', async (c) => {
   const id = c.req.param('id');
   if (!isUuid(id)) return c.json({ error: 'invalid_id' }, 400);
-  await c.env.DB.prepare('DELETE FROM tasks WHERE id = ?1 AND user_id = ?2').bind(id, c.get('user').id).run();
+  await c.env.DB.prepare(
+    'DELETE FROM tasks WHERE id = ?1 AND board_id IN (SELECT board_id FROM board_members WHERE email = ?2)',
+  )
+    .bind(id, c.get('user').email.toLowerCase())
+    .run();
   return c.body(null, 204);
 });

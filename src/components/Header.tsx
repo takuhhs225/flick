@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import type { User } from '../types';
+import type { BoardInfo, User } from '../types';
+import { BoardSwitcher } from './BoardSwitcher';
+import { SharePanel } from './SharePanel';
 import { Logo } from './icons';
 
 function Avatar({ user }: { user: User }) {
@@ -13,8 +15,21 @@ function Avatar({ user }: { user: User }) {
   );
 }
 
-export function Header({ user, onLogout }: { user: User; onLogout: () => void }) {
+export interface BoardControls {
+  boards: BoardInfo[];
+  boardId: string;
+  onSwitch: (id: string) => void;
+  onCreate: (name: string) => Promise<boolean>;
+  onRename: (id: string, name: string) => Promise<boolean>;
+  onAddMember: (id: string, email: string) => Promise<boolean>;
+  onRemoveMember: (id: string, email: string, self: boolean) => Promise<boolean>;
+  onDelete: (id: string) => Promise<boolean>;
+}
+
+export function Header({ user, onLogout, boards }: { user: User; onLogout: () => void; boards: BoardControls }) {
   const [open, setOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const current = boards.boards.find((b) => b.id === boards.boardId);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,6 +52,13 @@ export function Header({ user, onLogout }: { user: User; onLogout: () => void })
         <Logo />
         <span className="wordmark">Flick</span>
       </div>
+      <BoardSwitcher
+        boards={boards.boards}
+        boardId={boards.boardId}
+        onSwitch={boards.onSwitch}
+        onCreate={boards.onCreate}
+        onOpenShare={() => setSharing(true)}
+      />
       <div className="account" ref={wrapRef}>
         <motion.button
           type="button"
@@ -60,7 +82,7 @@ export function Header({ user, onLogout }: { user: User; onLogout: () => void })
               initial={{ opacity: 0, scale: 0.9, y: -8, filter: 'blur(6px)' }}
               animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, scale: 0.94, y: -4, filter: 'blur(4px)' }}
-              transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+              transition={{ default: { type: 'spring', stiffness: 520, damping: 34 }, filter: { duration: 0.22, ease: 'easeOut' } }}
             >
               <div className="menu-user" data-testid="menu-user">
                 {user.name && <strong>{user.name}</strong>}
@@ -73,6 +95,19 @@ export function Header({ user, onLogout }: { user: User; onLogout: () => void })
           )}
         </AnimatePresence>
       </div>
+      <AnimatePresence>
+        {sharing && current && (
+          <SharePanel
+            board={current}
+            selfEmail={user.email}
+            onClose={() => setSharing(false)}
+            onRename={(n) => boards.onRename(current.id, n)}
+            onAddMember={(e) => boards.onAddMember(current.id, e)}
+            onRemoveMember={(e, self) => boards.onRemoveMember(current.id, e, self)}
+            onDelete={() => boards.onDelete(current.id)}
+          />
+        )}
+      </AnimatePresence>
     </header>
   );
 }

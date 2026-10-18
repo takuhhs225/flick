@@ -9,7 +9,7 @@ export function Login() {
         data-testid="login"
         initial={{ opacity: 0, y: 24, scale: 0.94, filter: 'blur(10px)' }}
         animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
-        transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+        transition={{ default: { type: 'spring', stiffness: 260, damping: 26 }, filter: { duration: 0.22, ease: 'easeOut' } }}
       >
         <motion.div initial={{ scale: 0.6, rotate: -12 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 16, delay: 0.1 }}>
           <Logo size={64} />

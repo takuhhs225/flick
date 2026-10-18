@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Env, SessionUser, Vars } from './types';
+import { ensurePersonalBoard } from './personal';
 import { b64url, decodeJwtPayload, randomToken, safeEqual, sha256, sha256Hex } from './util';
 
 const SESSION_COOKIE = 'flick_session';
@@ -120,6 +121,8 @@ auth.get('/google/callback', async (c) => {
     .bind(crypto.randomUUID(), sub, email, name, picture, nowMs)
     .first<{ id: string }>();
   if (!row) return c.redirect(fail('internal'));
+
+  await ensurePersonalBoard(c.env.DB, { id: row.id, email, name, picture });
 
   const token = randomToken(32);
   await c.env.DB.batch([

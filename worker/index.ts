@@ -3,6 +3,9 @@ import type { Env, Vars } from './types';
 import { auth, getSessionUser, requireUser } from './auth';
 import { listTasks, tasks } from './tasks';
 import { ai } from './ai';
+import { boards, isMember, listBoards } from './boards';
+import { ensurePersonalBoard } from './personal';
+import { isUuid } from './util';
 
 const app = new Hono<{ Bindings: Env; Variables: Vars }>();
 
@@ -25,8 +28,14 @@ app.get('/api/me', requireUser, (c) => c.json({ user: c.get('user') }));
 app.get('/api/bootstrap', async (c) => {
   const user = await getSessionUser(c);
   if (!user) return c.json({ user: null });
-  return c.json({ user, tasks: await listTasks(c.env.DB, user.id) });
+  await ensurePersonalBoard(c.env.DB, user);
+  // ?board= で開くボードを指定(自分がメンバーでなければ個人ボードに戻す)
+  const wanted = c.req.query('board');
+  const boardId = wanted && isUuid(wanted) && (await isMember(c.env.DB, wanted, user.email)) ? wanted : user.id;
+  const [boardList, taskList] = await Promise.all([listBoards(c.env.DB, user), listTasks(c.env.DB, boardId)]);
+  return c.json({ user, boards: boardList, boardId, tasks: taskList });
 });
+app.route('/api/boards', boards);
 app.route('/api/tasks', tasks);
 app.route('/api/ai', ai);
 

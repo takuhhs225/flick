@@ -107,3 +107,55 @@ export async function trackpadSwipe(card: Locator, perEventDeltaX: number, event
     { perEventDeltaX, events, intervalMs, tailEvents },
   );
 }
+
+// ───────── 共有ボード ─────────
+export const boardName = (page: Page) => page.getByTestId('board-name');
+
+export async function openBoardMenu(page: Page) {
+  await page.getByTestId('board-switcher').click();
+  await expect(page.getByRole('menu')).toBeVisible();
+}
+
+export async function switchBoard(page: Page, name: string) {
+  await openBoardMenu(page);
+  await page.getByTestId('board-option').filter({ hasText: name }).click();
+  await expect(boardName(page)).toHaveText(name);
+}
+
+export async function createBoard(page: Page, name: string) {
+  await openBoardMenu(page);
+  await page.getByTestId('board-new-input').fill(name);
+  await page.getByTestId('board-create').click();
+  await expect(boardName(page)).toHaveText(name);
+}
+
+export async function openShare(page: Page) {
+  await page.getByTestId('share-button').click();
+  await expect(page.getByTestId('share-panel')).toBeVisible();
+}
+
+export async function inviteMember(page: Page, email: string) {
+  await openShare(page);
+  await page.getByTestId('member-email').fill(email);
+  await page.getByTestId('member-add').click();
+  await expect(page.getByTestId('member-row').filter({ hasText: email })).toHaveCount(1);
+  await page.getByTestId('share-close').click();
+  await expect(page.getByTestId('share-panel')).toHaveCount(0);
+}
+
+/** 別ユーザーとして、独立したブラウザ(Cookie も別)でログインする */
+export async function loginAs(browser: import('@playwright/test').Browser, email: string, name = '共有相手') {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const problems: string[] = [];
+  page.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && problems.push(m.text()));
+  page.on('pageerror', (e) => problems.push(e.message));
+  await login(page, email, name);
+  return { ctx, page, problems };
+}
+
+export async function boardIdOf(page: Page, name: string): Promise<string> {
+  const res = await page.request.get('/api/bootstrap');
+  const data = (await res.json()) as { boards: { id: string; name: string }[] };
+  return data.boards.find((b) => b.name === name)!.id;
+}

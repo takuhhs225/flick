@@ -32,3 +32,21 @@ export interface MotionHint {
   dir: number;
   via?: 'key' | 'pointer' | 'wheel';
 }
+
+export interface BoardInfo {
+  id: string;
+  name: string;
+  ownerEmail: string;
+  isOwner: boolean;
+  /** 個人ボード(自分専用。共有・削除はできない) */
+  isPersonal: boolean;
+  /** メンバーのメールアドレス(所有者を含む) */
+  members: string[];
+}
+
+export interface Bootstrap {
+  user: User | null;
+  boards?: BoardInfo[];
+  boardId?: string;
+  tasks?: Task[];
+}

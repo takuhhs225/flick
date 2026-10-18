@@ -42,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               initial={{ opacity: 0, y: 28, scale: 0.9, filter: 'blur(8px)' }}
               animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: 12, scale: 0.96, filter: 'blur(4px)' }}
-              transition={{ type: 'spring', stiffness: 480, damping: 34 }}
+              transition={{ default: { type: 'spring', stiffness: 480, damping: 34 }, filter: { duration: 0.22, ease: 'easeOut' } }}
             >
               <span>{t.message}</span>
               {t.action && (

@@ -111,7 +111,7 @@ test.describe('レスポンシブ (狭い画面)', () => {
 
   test('スケルトンも狭い画面用(1列 + タブ)で全画面表示される', async ({ page }) => {
     await login(page);
-    await page.route('**/api/bootstrap', async (route) => {
+    await page.route('**/api/bootstrap*', async (route) => {
       await new Promise((r) => setTimeout(r, 1000));
       await route.continue();
     });
