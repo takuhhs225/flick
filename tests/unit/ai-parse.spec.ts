@@ -34,3 +34,11 @@ test.describe('AI 応答のパーサー', () => {
     expect(parseSteps('')).toEqual([]);
   });
 });
+
+test.describe('extractText: 本文が空になる返却', () => {
+  test('content が null(推論だけで上限に達した等)のときは空文字になり、例外にならない', () => {
+    expect(extractText({ choices: [{ message: { content: null, reasoning_content: '考え中…' }, finish_reason: 'length' }] })).toBe('');
+    expect(extractText({ choices: [] })).toBe('');
+    expect(extractText(null)).toBe('');
+  });
+});

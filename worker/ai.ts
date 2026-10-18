@@ -93,10 +93,18 @@ async function run(env: Env, system: string, user: string): Promise<string> {
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    max_tokens: 400,
+    // 推論(thinking)対応モデルは、考える分のトークンで上限を使い切ると本文が空になる。
+    // 考える機能は切り、上限にも余裕を持たせる(未対応のモデルでは無視される)。
+    max_completion_tokens: 2048,
+    chat_template_kwargs: { enable_thinking: false },
     temperature: 0.3,
   } as never);
-  return extractText(res);
+  const text = extractText(res);
+  if (!text.trim()) {
+    // 原因調査用(`wrangler tail` で確認できる): 返却の形だけを記録し、本文は残さない
+    console.error('ai empty output', JSON.stringify(res, (_k, v) => (typeof v === 'string' ? v.slice(0, 80) : v)).slice(0, 1500));
+  }
+  return text;
 }
 
 async function readText(c: { req: { json: () => Promise<unknown> } }): Promise<string | null> {
