@@ -11,6 +11,9 @@ export interface CardProps {
   /** 初回表示時のカスケード用の遅延(秒) */
   stagger: number;
   busy: boolean;
+  /** タップ/クリックで選択中(操作ボタンを表示)。同時に選択できるカードは1枚だけ */
+  active: boolean;
+  onActivate: (id: string | null) => void;
   onMove: (id: string, to: Status, dir: number, via?: MotionHint['via']) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
@@ -46,7 +49,7 @@ function makeVariants(stagger: number): Variants {
   };
 }
 
-export function Card({ task, ref, hint, stagger, busy, onMove, onRename, onDelete, onRefine, onBreakdown }: CardProps) {
+export function Card({ task, ref, hint, stagger, busy, active, onActivate, onMove, onRename, onDelete, onRefine, onBreakdown }: CardProps) {
   const reduce = useReducedMotion();
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-220, 0, 220], reduce ? [0, 0, 0] : [-2.5, 0, 2.5]);
@@ -61,6 +64,11 @@ export function Card({ task, ref, hint, stagger, busy, onMove, onRename, onDelet
   const [editing, setEditing] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const cancelEdit = useRef(false);
+
+  // 別のカードが選ばれたら、AI メニューも一緒に閉じる
+  useEffect(() => {
+    if (!active) setAiOpen(false);
+  }, [active]);
 
   const idx = STATUSES.indexOf(task.status);
   const prev = STATUSES[idx - 1];
@@ -197,7 +205,7 @@ export function Card({ task, ref, hint, stagger, busy, onMove, onRename, onDelet
 
       <motion.div
         ref={cardRef}
-        className={`card glass${busy ? ' is-busy' : ''}${aiOpen ? ' is-menu-open' : ''}`}
+        className={`card glass${busy ? ' is-busy' : ''}${aiOpen ? ' is-menu-open' : ''}${active ? ' is-active' : ''}`}
         data-testid="card-body"
         tabIndex={0}
         role="group"
@@ -210,6 +218,8 @@ export function Card({ task, ref, hint, stagger, busy, onMove, onRename, onDelet
         dragMomentum={false}
         dragElastic={0.2}
         dragConstraints={{ left: prev ? -9999 : 0, right: next ? 9999 : 0 }}
+        onPointerDownCapture={() => onActivate(task.id)}
+        onPointerLeave={(e) => e.pointerType === 'mouse' && !aiOpen && active && onActivate(null)}
         onDragStart={() => (draggedRef.current = true)}
         onDragEnd={onDragEnd}
         onPointerDown={(e) => {

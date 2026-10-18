@@ -63,6 +63,7 @@ button {
 /* ───────────── Liquid Glass ───────────── */
 .glass {
   position: relative;
+  isolation: isolate; /* 光沢(::before)を中身より後ろに敷くため */
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.5) 100%);
   -webkit-backdrop-filter: blur(26px) saturate(185%);
   backdrop-filter: blur(26px) saturate(185%);
@@ -94,6 +95,8 @@ button {
   border-radius: inherit;
   pointer-events: none;
   background: radial-gradient(180px 130px at var(--mx, 18%) var(--my, 0%), rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%);
+  /* 文字の上に重ねると白く霞んで薄く見えるので、中身の後ろ(背景の上)に置く */
+  z-index: -1;
   opacity: 0.35;
   transition: opacity 0.35s var(--ease-out);
 }
@@ -188,8 +191,13 @@ button {
   flex: none;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   border-radius: 10px;
   color: var(--ink-3);
   opacity: 0.45;
@@ -395,12 +403,20 @@ button {
   pointer-events: none;
   transition: opacity 0.2s, transform 0.3s var(--ease-out);
 }
-.card:hover .card-tools,
-.card:focus-within .card-tools,
-.card.is-menu-open .card-tools {
+.card.is-active .card-tools,
+.card.is-menu-open .card-tools,
+.card:has(:focus-visible) .card-tools {
   opacity: 1;
   transform: none;
   pointer-events: auto;
+}
+/* マウスは重ねるだけで表示。タッチ端末では「触れたカード1枚だけ」に表示(ホバーが残らない) */
+@media (hover: hover) {
+  .card:hover .card-tools {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
 }
 .card-tools button {
   width: 30px;

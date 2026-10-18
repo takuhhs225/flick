@@ -64,15 +64,23 @@ export function Composer({ ready, onSubmit }: Props) {
         autoComplete="off"
         autoCapitalize="off"
         spellCheck={false}
-        enterKeyHint="done"
+        enterKeyHint="send"
         placeholder="メモ"
         aria-label="メモを追加"
         onChange={(e) => composerStore.set({ draft: e.target.value })}
         onKeyDown={onKeyDown}
       />
-      <span className={`composer-kbd${draft.trim() ? ' is-active' : ''}`} aria-hidden="true">
+      {/* 画面上の送信ボタン。タップしても入力欄のフォーカス(キーボード)を外さない */}
+      <button
+        type="button"
+        className={`composer-kbd${draft.trim() ? ' is-active' : ''}`}
+        data-testid="composer-submit"
+        aria-label="メモを追加"
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={submit}
+      >
         <ReturnIcon />
-      </span>
+      </button>
     </div>
   );
 }

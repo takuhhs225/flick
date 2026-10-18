@@ -37,7 +37,15 @@ function Count({ n }: { n: number }) {
   );
 }
 
-function Column({ status, tasks, firstLoad, ...handlers }: { status: Status; tasks: Task[]; firstLoad: boolean } & Omit<BoardProps, 'tasks'>) {
+interface ColumnProps extends Omit<BoardProps, 'tasks' | 'switching'> {
+  status: Status;
+  tasks: Task[];
+  firstLoad: boolean;
+  activeId: string | null;
+  onActivate: (id: string | null) => void;
+}
+
+function Column({ status, tasks, firstLoad, ...handlers }: ColumnProps) {
   const { hint, busy } = handlers;
   return (
     <section className="column glass" data-testid={`column-${status}`} data-status={status} aria-label={STATUS_LABEL[status]}>
@@ -55,6 +63,8 @@ function Column({ status, tasks, firstLoad, ...handlers }: { status: Status; tas
               hint={hint}
               stagger={firstLoad ? Math.min(i, 8) * 0.045 : 0}
               busy={busy.has(t.id)}
+              active={handlers.activeId === t.id}
+              onActivate={handlers.onActivate}
               onMove={handlers.onMove}
               onRename={handlers.onRename}
               onDelete={handlers.onDelete}
@@ -73,6 +83,16 @@ export function Board(props: BoardProps) {
   const wide = useMediaQuery('(min-width: 900px)');
   const [tab, setTab] = useState<Status>('todo');
 
+  // 操作ボタンを出すカードは常に1枚だけ。カード以外をタップしたら閉じる
+  const [activeId, setActiveId] = useState<string | null>(null);
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.('[data-testid="card-body"]')) setActiveId(null);
+    };
+    window.addEventListener('pointerdown', onDown);
+    return () => window.removeEventListener('pointerdown', onDown);
+  }, []);
+
   // 初回表示のときだけカードを順番に降らせる
   const [firstLoad, setFirstLoad] = useState(true);
   const timer = useRef(0);
@@ -82,8 +102,9 @@ export function Board(props: BoardProps) {
   }, []);
 
   const byStatus = (s: Status) => props.tasks.filter((t) => t.status === s).sort((a, b) => b.position - a.position);
-  const { tasks: _omit, switching, ...rest } = props;
+  const { tasks: _omit, switching, ...restProps } = props;
   void _omit;
+  const rest = { ...restProps, activeId, onActivate: setActiveId };
   const cls = switching ? ' is-switching' : '';
 
   if (wide) {
