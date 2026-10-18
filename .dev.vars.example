@@ -1,0 +1,5 @@
+# ローカル開発用 (`cp .dev.vars.example .dev.vars` して値を入れる。.dev.vars は git 管理外)
+GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxxxxxxx
+# 任意: ログインを許可するメールアドレス(カンマ区切り)。未設定なら Google アカウントなら誰でもログイン可
+# ALLOWED_EMAILS=you@example.com

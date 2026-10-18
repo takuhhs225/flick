@@ -1,0 +1,647 @@
+/* ───────────── tokens ───────────── */
+:root {
+  color-scheme: light;
+  --ink: #171a21;
+  --ink-2: #5a6272;
+  --ink-3: #98a0b0;
+  --todo: #5b7cfa;
+  --doing: #f59e0b;
+  --done: #22b573;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', system-ui, sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-1: 0 1px 2px rgba(23, 26, 33, 0.05), 0 8px 22px -8px rgba(23, 26, 33, 0.12);
+  --shadow-2: 0 2px 4px rgba(23, 26, 33, 0.05), 0 16px 40px -12px rgba(23, 26, 33, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  overscroll-behavior-x: none; /* Mac のトラックパッド横スワイプで「戻る」が発火しないように */
+}
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: #fff;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection {
+  background: rgba(91, 124, 250, 0.22);
+}
+button {
+  font-family: inherit;
+}
+
+/* ───────────── 背景: 白ベース + ごく淡い色のゆらぎ(ガラスが透かして見せる) ───────────── */
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f8fd 100%);
+}
+/* 色の溜まりは radial-gradient(filter: blur は再描画が重い)。常時アニメーションはせず、
+   ポインタの動きにだけ追従して視差で動く = 触っていない間は GPU/バッテリーを使わない */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--b) 0%, rgba(255, 255, 255, 0) 100%);
+  opacity: 0.85;
+  will-change: transform;
+  transition: transform 1.6s var(--ease-out);
+  transform: translate3d(calc(var(--px, 0) * var(--kx, 40px)), calc(var(--py, 0) * var(--ky, 30px)), 0);
+}
+.b1 { --b: #c6d9ff; --kx: -46px; --ky: -34px; width: 66vmax; height: 66vmax; left: -22vmax; top: -26vmax; }
+.b2 { --b: #e6d4ff; --kx: 54px; --ky: -28px; width: 56vmax; height: 56vmax; right: -20vmax; top: -6vmax; }
+.b3 { --b: #ffe0cc; --kx: -38px; --ky: 44px; width: 52vmax; height: 52vmax; left: 20vmax; bottom: -28vmax; }
+.b4 { --b: #cdf3e0; --kx: 60px; --ky: 36px; width: 40vmax; height: 40vmax; right: -4vmax; bottom: -16vmax; }
+
+/* ───────────── Liquid Glass ───────────── */
+.glass {
+  position: relative;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.5) 100%);
+  -webkit-backdrop-filter: blur(26px) saturate(185%);
+  backdrop-filter: blur(26px) saturate(185%);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    var(--shadow-1),
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 rgba(120, 130, 160, 0.1),
+    inset 0 0 0 1px rgba(150, 160, 190, 0.1);
+}
+/* 縁のハイライト(屈折して光る縁) */
+.glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, 0.85));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+/* ポインタに追従する光沢 */
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(180px 130px at var(--mx, 18%) var(--my, 0%), rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%);
+  opacity: 0.35;
+  transition: opacity 0.35s var(--ease-out);
+}
+.glass:hover::before,
+.glass:focus-within::before {
+  opacity: 0.9;
+}
+
+/* ───────────── レイアウト ───────────── */
+.app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 18px clamp(16px, 3vw, 36px) 56px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wordmark {
+  margin: 0;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.wordmark-lg {
+  font-size: 28px;
+}
+
+/* ───────────── メモ入力 ───────────── */
+.composer {
+  width: min(720px, 100%);
+  height: 62px;
+  margin: 22px auto 28px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 0 14px;
+  transition: box-shadow 0.35s var(--ease-out), transform 0.35s var(--ease-out);
+}
+.composer:focus-within {
+  transform: translateY(-1px) scale(1.012);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 5px rgba(120, 140, 255, 0.15),
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 rgba(120, 130, 160, 0.1);
+}
+.composer[data-pulse='1'] { animation: pulse-a 0.5s var(--ease-out); }
+.composer[data-pulse='0'] { animation: pulse-b 0.5s var(--ease-out); }
+@keyframes pulse-a { 40% { transform: scale(1.03); box-shadow: var(--shadow-2), 0 0 0 9px rgba(91, 124, 250, 0.18); } }
+@keyframes pulse-b { 40% { transform: scale(1.03); box-shadow: var(--shadow-2), 0 0 0 9px rgba(91, 124, 250, 0.18); } }
+.composer-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #8aa4ff, #b69cff);
+  box-shadow: 0 6px 14px -4px rgba(120, 140, 255, 0.6);
+}
+.composer input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  color: var(--ink);
+  caret-color: var(--todo);
+}
+.composer input::placeholder {
+  color: var(--ink-3);
+}
+.composer-kbd {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--ink-3);
+  opacity: 0.45;
+  transition: opacity 0.25s, background 0.25s, color 0.25s, transform 0.3s var(--ease-out);
+}
+.composer-kbd.is-active {
+  opacity: 1;
+  color: var(--todo);
+  background: rgba(91, 124, 250, 0.12);
+  transform: scale(1.06);
+}
+
+/* ───────────── ボード ───────────── */
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+  flex: 1;
+}
+.column {
+  --c: var(--todo);
+  border-radius: 30px;
+  padding: 16px 14px 18px;
+  min-height: 360px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.3));
+}
+.column[data-status='doing'] { --c: var(--doing); }
+.column[data-status='done'] { --c: var(--done); }
+.col-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 6px 14px;
+}
+.col-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 18%, transparent);
+}
+.count {
+  margin-left: auto;
+  position: relative;
+  display: inline-block;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 10px;
+  line-height: 22px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  background: rgba(23, 26, 33, 0.05);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.col-empty {
+  height: 96px;
+  margin-top: 4px;
+  border-radius: 22px;
+  border: 1.5px dashed rgba(120, 130, 160, 0.22);
+}
+
+/* ───────────── カード ───────────── */
+.card-wrap {
+  position: relative;
+  z-index: 0;
+}
+.card-wrap:has(.is-menu-open) { z-index: 30; }
+.card-wrap:has(.card:active) { z-index: 40; }
+
+.hint {
+  --c: var(--todo);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 22px;
+  border-radius: 22px;
+  font-size: 13px;
+  font-weight: 650;
+  pointer-events: none;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 16%, rgba(255, 255, 255, 0.7));
+}
+.hint[data-status='doing'] { --c: #c77d02; }
+.hint[data-status='done'] { --c: #14935a; }
+.hint-next { justify-content: flex-start; }
+.hint-prev { justify-content: flex-end; }
+
+.card.glass {
+  /* 列(backdrop-filter 済み)の内側なので、ここでの backdrop-filter は効果がなく重いだけ → 使わない */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.78));
+}
+.card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 12px 14px 16px;
+  border-radius: 22px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+  outline: none;
+}
+.card:active { cursor: grabbing; }
+.card:focus-visible {
+  box-shadow:
+    var(--shadow-1),
+    0 0 0 3px rgba(91, 124, 250, 0.5),
+    inset 0 1px 0 #fff;
+}
+.card:hover { box-shadow: var(--shadow-2), inset 0 1px 0 #fff, inset 0 -1px 0 rgba(120, 130, 160, 0.1); }
+.status-icon { flex: none; margin-top: 1px; }
+.spin { transform-origin: 12px 12px; animation: spin 1.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.card-title {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.5;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  transition: color 0.35s, text-decoration-color 0.35s;
+}
+.card-title.is-done {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: rgba(34, 181, 115, 0.6);
+}
+.card-meta {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.card-edit {
+  width: 100%;
+  font: inherit;
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--todo);
+  outline: none;
+  padding: 0 0 1px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.card.is-busy .card-title {
+  background: linear-gradient(90deg, var(--ink) 30%, #8aa4ff 50%, var(--ink) 70%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shimmer 1.1s linear infinite;
+}
+@keyframes text-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+
+/* ツールは右上にオーバーレイ(非表示時にタイトルの幅を奪わない) */
+.card-tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 4px 14px -4px rgba(23, 26, 33, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  transform: translateY(-3px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.3s var(--ease-out);
+}
+.card:hover .card-tools,
+.card:focus-within .card-tools,
+.card.is-menu-open .card-tools {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.card-tools button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+.card-tools button:hover { background: rgba(23, 26, 33, 0.07); color: var(--ink); }
+.card-tools button:active { transform: scale(0.88); }
+.card-tools button:disabled { opacity: 0.4; cursor: default; }
+.ai-wrap { position: relative; }
+.ai-menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  z-index: 20;
+  min-width: 176px;
+  padding: 6px;
+  border-radius: 16px;
+  transform-origin: top right;
+  background: rgba(255, 255, 255, 0.94);
+}
+.card-tools .ai-menu button {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ink);
+  border-radius: 11px;
+}
+
+/* ───────────── タブ(狭い画面) ───────────── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+}
+.tab {
+  position: relative;
+  flex: 1;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.tab[aria-selected='true'] { color: var(--ink); }
+.tab-pill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(23, 26, 33, 0.08), 0 6px 14px -6px rgba(23, 26, 33, 0.18);
+}
+.tab-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tab .count { margin-left: 0; min-width: 24px; background: rgba(23, 26, 33, 0.06); }
+.sk-tabs { display: none; }
+
+/* ───────────── アカウント ───────────── */
+.account { position: relative; }
+.avatar-btn {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.avatar {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px #fff, var(--shadow-1);
+}
+.avatar-fallback {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #8aa4ff, #b69cff);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+}
+.menu {
+  position: absolute;
+  right: 0;
+  top: 46px;
+  z-index: 50;
+  min-width: 232px;
+  padding: 8px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.92);
+}
+.menu-user {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.menu-user strong { color: var(--ink); font-size: 14.5px; }
+.menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 14.5px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.menu button:hover { background: rgba(23, 26, 33, 0.06); }
+
+/* ───────────── ログイン ───────────── */
+.login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.login-card {
+  width: min(360px, 100%);
+  padding: 44px 32px 34px;
+  border-radius: 38px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.google-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 54px;
+  margin-top: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(23, 26, 33, 0.08);
+  background: #fff;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+}
+.error-text { margin: 0; color: var(--ink-2); font-size: 15px; }
+
+/* ───────────── トースト ───────────── */
+.toasts {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 28px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 100%;
+  padding: 12px 14px 12px 20px;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 500;
+  box-shadow: var(--shadow-2), inset 0 1px 0 #fff;
+}
+.toast.is-error { color: #b42318; background: linear-gradient(145deg, rgba(255, 244, 242, 0.9), rgba(255, 255, 255, 0.6)); }
+.toast button {
+  border: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(91, 124, 250, 0.12);
+  color: #3f5fe0;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.2s;
+}
+.toast button:hover { background: rgba(91, 124, 250, 0.2); }
+.toast button:active { transform: scale(0.94); }
+
+/* ───────────── スケルトン ───────────── */
+.sk {
+  background: linear-gradient(100deg, rgba(205, 213, 232, 0.55) 25%, rgba(255, 255, 255, 0.95) 42%, rgba(205, 213, 232, 0.55) 60%);
+  background-size: 220% 100%;
+  animation: shimmer 1.5s linear infinite;
+  border-radius: 10px;
+}
+@keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+.sk-line { height: 13px; border-radius: 7px; }
+.sk-logo { width: 28px; height: 28px; border-radius: 9px; }
+.sk-avatar { width: 36px; height: 36px; border-radius: 50%; }
+.sk-dot { width: 10px; height: 10px; border-radius: 50%; }
+.sk-circle { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+.sk-card { align-items: center; cursor: default; }
+.sk-card-lines { flex: 1; display: flex; flex-direction: column; gap: 9px; }
+
+/* ───────────── 狭い画面 ───────────── */
+@media (max-width: 899px) {
+  .board { grid-template-columns: 1fr; }
+  .board.is-skeleton .column:nth-child(n + 2) { display: none; }
+  .sk-tabs { display: block; }
+  .composer { height: 56px; margin: 16px auto 20px; }
+  .column { min-height: 52vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blob { transition: none; }
+  .spin, .sk, .card.is-busy .card-title { animation: none; }
+  .composer, .composer:focus-within { transition: none; transform: none; }
+}
