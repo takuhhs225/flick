@@ -15,7 +15,7 @@
       "binding": "DB",
       "database_name": "flick",
       // `npx wrangler d1 create flick` で出力された ID に置き換えてください
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "bd6e1225-9714-4bfd-a97f-e36f7f23cd70",
       "migrations_dir": "migrations"
     }
   ],
